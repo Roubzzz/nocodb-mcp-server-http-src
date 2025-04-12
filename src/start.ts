@@ -704,6 +704,10 @@ const response = await createTable("Shinobi", [
       const timestamp = new Date().toISOString();
       console.log(`[${timestamp}] POST reçu sur /messages pour la session : ${sessionId}`);
 
+      // ---> AJOUT : Logguer le corps de la requête reçue <---
+      console.log(`[${timestamp}] POST /messages Body brut reçu :`, JSON.stringify(req.body));
+      // ---> FIN AJOUT <---
+
       if (transport) {
         try {
           // Délègue la gestion du message au transport SSE approprié
