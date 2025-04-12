@@ -145,34 +145,50 @@ export async function patchRecords(tableName: string, rowId: number, data: any) 
     console.log(`[patchRecords] Called with tableName: ${tableName}, rowId: ${rowId}`);
     const tableId = await getTableId(tableName);
     console.log(`[patchRecords] Resolved tableId: ${tableId} for tableName: ${tableName}`);
-    const requestUrl = `/api/v2/tables/${tableId}/records/${rowId}`; // Use record ID in the URL path
-    console.log(`[patchRecords] Attempting PATCH request to single-record URL: ${nocodbClient.defaults.baseURL}${requestUrl}`);
-    console.log(`[patchRecords] Request payload (data): ${JSON.stringify(data)}`);
-
+    
+    // Format correct : l'URL sans l'ID et l'ID inclus dans le corps
+    const requestUrl = `/api/v2/tables/${tableId}/records`;
+    
+    // S'assurer que l'ID est inclus dans les données
+    const patchData = { ...data, id: rowId };
+    
+    console.log(`[patchRecords] Attempting PATCH request to: ${nocodbClient.defaults.baseURL}${requestUrl} with data: ${JSON.stringify(patchData)}`);
+    
     try {
-        // The single-record endpoint expects just the data object
-        const response = await nocodbClient.patch(requestUrl, data);
-        console.log(`[patchRecords] PATCH request successful. Status: ${response.status}`);
+        const response = await nocodbClient.patch(requestUrl, patchData);
+        console.log(`[patchRecords] PATCH response status: ${response.status}`);
         return {
             output: response.data,
-            input: data
+            input: patchData
         }
     } catch (error: any) {
-        console.error(`[patchRecords] PATCH request failed. Error: ${error.message}`);
+        console.error(`[patchRecords] PATCH request failed: ${error.message}`);
         if (axios.isAxiosError(error)) {
-            console.error(`[patchRecords] Axios Error Details: Status=${error.response?.status}, Data=${JSON.stringify(error.response?.data)}`);
+            console.error(`[patchRecords] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
         }
         throw error;
     }
 }
 
 export async function deleteRecords(tableName: string, rowId: number) {
+    console.log(`[deleteRecords] Called with tableName: ${tableName}, rowId: ${rowId}`);
     const tableId = await getTableId(tableName);
+    console.log(`[deleteRecords] Resolved tableId: ${tableId} for tableName: ${tableName}`);
+    
+    // Format correct : l'ID doit être dans le corps avec la clé 'id' en minuscules
+    const requestUrl = `/api/v2/tables/${tableId}/records`;
+    const data = { id: rowId }; // id en minuscules est crucial
+    console.log(`[deleteRecords] Attempting DELETE request to: ${nocodbClient.defaults.baseURL}${requestUrl} with data: ${JSON.stringify(data)}`);
+    
     try {
-        const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records/${rowId}`);
+        const response = await nocodbClient.delete(requestUrl, { data });
+        console.log(`[deleteRecords] DELETE response status: ${response.status}`);
         return response.data;
     } catch (error: any) {
-        console.error(`[deleteRecords] Error deleting record: ${error.message}`);
+        console.error(`[deleteRecords] DELETE request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[deleteRecords] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
         throw error;
     }
 }
