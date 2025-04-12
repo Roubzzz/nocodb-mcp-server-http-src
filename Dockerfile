@@ -21,5 +21,8 @@ COPY env.example ./.env.example
 # Build the TypeScript source
 RUN npm run build
 
+# Expose port 3000 for HTTP/SSE server
+EXPOSE 3000
+
 # Default command to start the MCP server
 CMD ["node", "dist/start.js"]

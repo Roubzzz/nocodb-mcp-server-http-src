@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import {McpServer, ResourceTemplate} from "@modelcontextprotocol/sdk/server/mcp.js";
-import {StdioServerTransport} from "@modelcontextprotocol/sdk/server/stdio.js";
+import {SSEServerTransport} from "@modelcontextprotocol/sdk/server/sse.js";
+import express, { Request, Response } from "express";
+import cors from 'cors';
 import {z} from "zod";
 import axios, {AxiosInstance} from "axios";
 
@@ -502,11 +504,104 @@ const response = await createTable("Shinobi", [
         })
     );
 
-// Start receiving messages on stdin and sending messages on stdout
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+    // ---> Début : Implémentation Serveur HTTP/SSE <---
+    const app = express();
+    app.use(cors()); // Active CORS (Cross-Origin Resource Sharing)
+    app.use(express.json()); // Active le parsing des corps de requête JSON pour la route POST /messages
+
+    // Dictionnaire pour stocker les transports actifs par ID de session
+    const transports: {[sessionId: string]: SSEServerTransport} = {};
+
+    // Endpoint pour les connexions SSE (Server-Sent Events)
+    app.get("/sse", async (req: Request, res: Response) => {
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Nouvelle requête de connexion SSE reçue.`);
+
+      // Headers requis pour SSE
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders(); // Envoie les headers immédiatement
+
+      // Crée un nouveau transport SSE pour cette connexion spécifique
+      // Le '/messages' indique au client où envoyer les messages via POST
+      const transport = new SSEServerTransport('/messages', res);
+      const sessionId = transport.sessionId;
+      transports[sessionId] = transport; // Enregistre le transport
+      console.log(`[${timestamp}] Transport SSE créé pour la session : ${sessionId}`);
+
+      // Gestion de la déconnexion client
+      res.on("close", () => {
+        const closeTimestamp = new Date().toISOString();
+        console.log(`[${closeTimestamp}] Connexion SSE fermée pour la session : ${sessionId}`);
+        delete transports[sessionId]; // Nettoie le transport
+        // Note: Vérifier si transport.close() ou une méthode similaire existe dans le SDK pour un nettoyage plus propre
+      });
+
+      // Envoi périodique de commentaires pour maintenir la connexion ouverte (évite certains timeouts proxy)
+      const keepAliveInterval = setInterval(() => {
+        if (!res.writableEnded) {
+            res.write(': keep-alive\n\n'); // Envoie un commentaire SSE
+        } else {
+            // Arrête si la connexion est déjà fermée
+            clearInterval(keepAliveInterval);
+        }
+      }, 25000); // Toutes les 25 secondes
+
+      // Connecte la logique du serveur MCP à cette instance de transport
+      try {
+          await server.connect(transport);
+          console.log(`[${new Date().toISOString()}] McpServer connecté au transport pour la session : ${sessionId}`);
+      } catch (error) {
+          console.error(`[${new Date().toISOString()}] Erreur lors de la connexion de McpServer au transport ${sessionId}:`, error);
+          clearInterval(keepAliveInterval); // Arrête le keep-alive en cas d'erreur
+          if (!res.writableEnded) {
+              // Termine la réponse si une erreur survient pendant la connexion
+              res.status(500).end();
+          }
+      }
+    });
+
+    // Endpoint pour recevoir les messages envoyés par le client via POST
+    app.post("/messages", async (req: Request, res: Response) => {
+      const sessionId = req.query.sessionId as string; // L'ID de session est requis dans l'URL (?sessionId=...)
+      const transport = transports[sessionId]; // Trouve le transport correspondant
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] POST reçu sur /messages pour la session : ${sessionId}`);
+
+      if (transport) {
+        try {
+          // Délègue la gestion du message au transport SSE approprié
+          await transport.handlePostMessage(req, res);
+          // handlePostMessage devrait gérer l'envoi de la réponse HTTP au client
+        } catch (error) {
+          console.error(`[${timestamp}] Erreur lors du traitement du message POST pour la session ${sessionId}:`, error);
+          // Tente d'envoyer une réponse d'erreur si possible
+          if (!res.headersSent) {
+            res.status(500).send('Erreur lors du traitement du message');
+          } else if (!res.writableEnded){
+            res.end(); // Termine la connexion si les headers sont déjà envoyés
+          }
+        }
+      } else {
+        // Aucun transport trouvé pour cet ID de session
+        console.error(`[${timestamp}] Aucun transport trouvé pour la session ${sessionId} dans la requête POST /messages.`);
+        res.status(400).send('Aucun transport trouvé pour cet ID de session (sessionId manquant ou invalide dans les query params ?)');
+      }
+    });
+
+    // Définition du port d'écoute, priorité à la variable d'environnement PORT, sinon 3000 par défaut
+    const PORT = parseInt(process.env.PORT || "3000", 10);
+
+    // Démarrage du serveur Express qui écoute sur le port défini
+    app.listen(PORT, '0.0.0.0', () => { // Écoute sur 0.0.0.0 pour être accessible depuis Docker
+      const startTimestamp = new Date().toISOString();
+      console.log(`[${startTimestamp}] Serveur MCP (HTTP/SSE) démarré.`);
+      console.log(`[${startTimestamp}] Écoute sur le port : ${PORT}`);
+      console.log(`[${startTimestamp}] Endpoint SSE disponible sur : http://<votre-ip>:${PORT}/sse`);
+      console.log(`[${startTimestamp}] Endpoint pour messages client : POST http://<votre-ip>:${PORT}/messages?sessionId=<ID>`);
+    });
+    // ---> Fin : Implémentation Serveur HTTP/SSE <---
 }
 
-
 void main();
-
