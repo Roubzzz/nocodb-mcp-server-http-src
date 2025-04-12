@@ -301,14 +301,27 @@ You can also use other comparison operators like 'ne' (not equal), 'gt' (greater
         },
         async ({tableName, filters, limit, offset, sort, fields}) => {
             console.log("[TOOL] nocodb-get-records called with:", { tableName, filters, limit, offset, sort, fields });
-            const response = await getRecords(tableName, filters, limit, offset, sort, fields);
-            console.log("[TOOL] nocodb-get-records response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await getRecords(tableName, filters, limit, offset, sort, fields);
+                console.log("[TOOL] nocodb-get-records response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-get-records error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -321,14 +334,27 @@ notes: only show result from output to user
         {},
         async () => {
             console.log("[TOOL] nocodb-get-list-tables called");
-            const response = await getListTables()
-            console.log("[TOOL] nocodb-get-list-tables response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await getListTables()
+                console.log("[TOOL] nocodb-get-list-tables response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-get-list-tables error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     )
@@ -348,14 +374,27 @@ const response = await postRecords("Shinobi", {
         },
         async ({tableName, data}) => {
             console.log("[TOOL] nocodb-post-records called with:", { tableName, data });
-            const response = await postRecords(tableName, data)
-            console.log("[TOOL] nocodb-post-records response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await postRecords(tableName, data)
+                console.log("[TOOL] nocodb-post-records response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-post-records error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -375,14 +414,27 @@ const response = await patchRecords("Shinobi", 2, {
         },
         async ({tableName, rowId, data}) => {
             console.log("[TOOL] nocodb-patch-records called with:", { tableName, rowId, data });
-            const response = await patchRecords(tableName, rowId, data)
-            console.log("[TOOL] nocodb-patch-records response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await patchRecords(tableName, rowId, data)
+                console.log("[TOOL] nocodb-patch-records response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-patch-records error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -392,14 +444,27 @@ const response = await patchRecords("Shinobi", 2, {
         {tableName: z.string(), rowId: z.number()},
         async ({tableName, rowId}) => {
             console.log("[TOOL] nocodb-delete-records called with:", { tableName, rowId });
-            const response = await deleteRecords(tableName, rowId)
-            console.log("[TOOL] nocodb-delete-records response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await deleteRecords(tableName, rowId)
+                console.log("[TOOL] nocodb-delete-records response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-delete-records error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -409,14 +474,27 @@ const response = await patchRecords("Shinobi", 2, {
         {tableName: z.string()},
         async ({tableName}) => {
             console.log("[TOOL] nocodb-get-table-metadata called with:", { tableName });
-            const response = await getTableMetadata(tableName)
-            console.log("[TOOL] nocodb-get-table-metadata response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await getTableMetadata(tableName)
+                console.log("[TOOL] nocodb-get-table-metadata response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-get-table-metadata error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -430,14 +508,27 @@ const response = await patchRecords("Shinobi", 2, {
         },
         async ({tableName, columnName, columnType}) => {
             console.log("[TOOL] nocodb-alter-table-add-column called with:", { tableName, columnName, columnType });
-            const response = await alterTableAddColumn(tableName, columnName, columnType)
-            console.log("[TOOL] nocodb-alter-table-add-column response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await alterTableAddColumn(tableName, columnName, columnType)
+                console.log("[TOOL] nocodb-alter-table-add-column response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-alter-table-add-column error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -452,14 +543,27 @@ const response = await patchRecords("Shinobi", 2, {
         {columnId: z.string()},
         async ({columnId}) => {
             console.log("[TOOL] nocodb-alter-table-remove-column called with:", { columnId });
-            const response = await alterTableRemoveColumn(columnId)
-            console.log("[TOOL] nocodb-alter-table-remove-column response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await alterTableRemoveColumn(columnId)
+                console.log("[TOOL] nocodb-alter-table-remove-column response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-alter-table-remove-column error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
@@ -497,14 +601,27 @@ const response = await createTable("Shinobi", [
         },
         async ({tableName, data}) => {
             console.log("[TOOL] nocodb-create-table called with:", { tableName, data });
-            const response = await createTable(tableName, data)
-            console.log("[TOOL] nocodb-create-table response:", response);
-            return {
-                content: [{
-                    type: 'text',
-                    mimeType: 'application/json',
-                    text: JSON.stringify(response),
-                }],
+            try {
+                const response = await createTable(tableName, data)
+                console.log("[TOOL] nocodb-create-table response:", response);
+                return {
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify(response),
+                    }],
+                }
+            } catch (error: any) {
+                console.error("[TOOL] nocodb-create-table error:", error);
+                return {
+                    isError: true,
+                    error: error?.message || String(error),
+                    content: [{
+                        type: 'text',
+                        mimeType: 'application/json',
+                        text: JSON.stringify({ error: error?.message || String(error) })
+                    }]
+                };
             }
         }
     );
