@@ -339,11 +339,52 @@ export async function getTableMetadata(tableName: string) {
     }
 }
 
-export async function alterTableAddColumn(tableName: string, columnName: string, columnType: string) {
-    console.log(`[alterTableAddColumn] Called for table: ${tableName}, columnName: ${columnName}, columnType: ${columnType}`);
-    const tableId = await getTableId(tableName);
+// Define options specific to LinkToAnotherRecord
+interface LinkColumnOptions {
+    parentId: string; // ID of the related table
+    childId: string; // ID of the current table (where the column is added)
+    relationType: 'hm' | 'bt' | 'mm'; // NocoDB relation types: HasMany, BelongsTo, ManyToMany
+}
+
+export async function alterTableAddColumn(
+    tableName: string,
+    columnName: string,
+    columnType: string,
+    options?: LinkColumnOptions // Optional parameters for link types
+) {
+    console.log(`[alterTableAddColumn] Called for table: ${tableName}, columnName: ${columnName}, columnType: ${columnType}, options: ${JSON.stringify(options)}`);
+    const tableId = await getTableId(tableName); // This is the childId for links
     const requestUrl = `/api/v2/meta/tables/${tableId}/columns`;
-    const payload = { title: columnName, uidt: columnType };
+
+    let payload: any;
+
+    if (columnType === 'LinkToAnotherRecord') {
+        if (!options) {
+            throw new Error("Missing required options (parentId, relationType) for LinkToAnotherRecord column type.");
+        }
+        // Construct payload specific to LinkToAnotherRecord
+        // Assuming NocoDB API field names based on common patterns and the error message
+        payload = {
+            title: columnName,
+            uidt: columnType,
+            fk_related_model_id: options.parentId, // ID of the table being linked TO
+            // childId is implicitly the tableId where the column is created
+            // fk_child_column_id, fk_parent_column_id might be handled by NocoDB or needed for specific cases (null for now)
+            fk_child_column_id: null,
+            fk_parent_column_id: null,
+            // ManyToMany specific fields (null if not 'mm')
+            fk_mm_model_id: options.relationType === 'mm' ? options.parentId : null, // Needs confirmation if parentId is correct here for MM
+            fk_mm_child_column_id: null,
+            fk_mm_parent_column_id: null,
+            type: options.relationType // Relation type ('hm', 'bt', 'mm')
+        };
+        console.log(`[alterTableAddColumn] LinkToAnotherRecord payload constructed.`);
+    } else {
+        // Default payload for other column types
+        payload = { title: columnName, uidt: columnType };
+        console.log(`[alterTableAddColumn] Standard payload constructed.`);
+    }
+
     console.log(`[alterTableAddColumn] Requesting POST: ${nocodbClient.defaults.baseURL}${requestUrl} with data: ${JSON.stringify(payload)}`);
     try {
         const response = await nocodbClient.post(requestUrl, payload);

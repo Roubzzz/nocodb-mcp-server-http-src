@@ -237,14 +237,41 @@ export function registerNocoDbTools(server: McpServer) {
     server.tool("nocodb-alter-table-add-column",
         "Nocodb - Alter Table Add Column. Adds a new column to an existing table." +
         `\nSupported column types (uidt): SingleLineText, LongText, Number, Decimal, Date, DateTime, Time, Year, Duration, Currency, Percent, Rollup, Formula, LinkToAnotherRecord, LookUp, Checkbox, MultiSelect, SingleSelect, Collaborator, Attachment, Barcode, QRCode, CreatedTime, LastModifiedTime, AutoNumber, Url, Email, Phone, Formula, User, CreatedBy, LastModifiedBy, SpecificDBType` +
-        `\nExample: alter_table_add_column(table_name="products", column_name="StockCount", column_type="Number")`,
+        `\nIMPORTANT: For 'LinkToAnotherRecord', you MUST provide 'parentTableName' and 'relationType'.` +
+        `\nExamples:\n` +
+        `1. Standard column: alter_table_add_column(table_name="products", column_name="StockCount", column_type="Number")\n` +
+        `2. Link column (HasMany): alter_table_add_column(table_name="authors", column_name="Books", column_type="LinkToAnotherRecord", parent_table_name="books", relation_type="hm")\n` +
+        `3. Link column (BelongsTo): alter_table_add_column(table_name="books", column_name="Author", column_type="LinkToAnotherRecord", parent_table_name="authors", relation_type="bt")`,
         {
-            tableName: z.string().describe("Name of the NocoDB table."),
+            tableName: z.string().describe("Name of the NocoDB table where the column will be added."),
             columnName: z.string().describe("Name for the new column."),
-            columnType: z.string().describe("Type of the new column (NocoDB UIDT).")
+            columnType: z.string().describe("Type of the new column (NocoDB UIDT)."),
+            // Optional fields, but required if columnType is LinkToAnotherRecord
+            parentTableName: z.string().optional().describe("Required if columnType is 'LinkToAnotherRecord'. Name of the table this column links TO."),
+            relationType: z.enum(['hm', 'bt', 'mm']).optional().describe("Required if columnType is 'LinkToAnotherRecord'. Type of relationship: 'hm' (HasMany), 'bt' (BelongsTo), 'mm' (ManyToMany).")
         },
         async (params) => {
-            const response = await NocoDB.alterTableAddColumn(params.tableName, params.columnName, params.columnType);
+            let response;
+            if (params.columnType === 'LinkToAnotherRecord') {
+                // Validate required fields for LinkToAnotherRecord
+                if (!params.parentTableName || !params.relationType) {
+                    throw new Error("For 'LinkToAnotherRecord' column type, 'parentTableName' and 'relationType' parameters are required.");
+                }
+                // Resolve IDs
+                const childId = await NocoDB.getTableId(params.tableName); // ID of the table where column is added
+                const parentId = await NocoDB.getTableId(params.parentTableName); // ID of the table being linked to
+
+                const linkOptions = {
+                    parentId: parentId,
+                    childId: childId,
+                    relationType: params.relationType
+                };
+                response = await NocoDB.alterTableAddColumn(params.tableName, params.columnName, params.columnType, linkOptions);
+
+            } else {
+                // For other column types, call without link options
+                response = await NocoDB.alterTableAddColumn(params.tableName, params.columnName, params.columnType);
+            }
             return {
                 content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }],
             }
