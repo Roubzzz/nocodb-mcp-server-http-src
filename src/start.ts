@@ -1,23 +1,21 @@
 #!/usr/bin/env node
-import {McpServer, ResourceTemplate} from "@modelcontextprotocol/sdk/server/mcp.js";
-import {SSEServerTransport} from "@modelcontextprotocol/sdk/server/sse.js";
+import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import express, { Request, Response } from "express";
 import cors from 'cors';
-import {z} from "zod";
-import axios, {AxiosInstance} from "axios";
+import { z } from "zod";
+import axios, { AxiosInstance } from "axios";
 
-let {NOCODB_URL, NOCODB_BASE_ID, NOCODB_API_TOKEN} = process.env;
+// --- Configuration et fonctions NocoDB (inchangées) ---
+let { NOCODB_URL, NOCODB_BASE_ID, NOCODB_API_TOKEN } = process.env;
 if (!NOCODB_URL || !NOCODB_BASE_ID || !NOCODB_API_TOKEN) {
-    // check from npx param input
     NOCODB_URL = process.argv[2] || NOCODB_URL;
     NOCODB_BASE_ID = process.argv[3] || NOCODB_BASE_ID;
     NOCODB_API_TOKEN = process.argv[4] || NOCODB_API_TOKEN;
-
     if (!NOCODB_URL || !NOCODB_BASE_ID || !NOCODB_API_TOKEN) {
         throw new Error("Missing required environment variables");
     }
 }
-
 
 const filterRules =
     `
@@ -80,7 +78,7 @@ Operation Example
 For date null rule
 (date,isnot,null) -> (date,notblank).
 (date,is,null) -> (date,blank).
-`
+`; // Fin filterRules
 
 const nocodbClient: AxiosInstance = axios.create({
     baseURL: NOCODB_URL.replace(/\/$/, ""),
@@ -91,80 +89,36 @@ const nocodbClient: AxiosInstance = axios.create({
     timeout: 30000,
 });
 
-export async function getRecords(tableName: string,
-                                 filters?: string,
-                                 limit?: number,
-                                 offset?: number,
-                                 sort?: string,
-                                 fields?: string,
-) {
+// --- Fonctions métiers NocoDB (getRecords, postRecords, etc. - inchangées) ---
+export async function getRecords(tableName: string, filters?: string, limit?: number, offset?: number, sort?: string, fields?: string) {
     const tableId = await getTableId(tableName);
-
-    const paramsArray = []
-    if (filters) {
-        paramsArray.push(`where=${filters}`);
-    }
-    if (limit) {
-        paramsArray.push(`limit=${limit}`);
-    }
-    if (offset) {
-        paramsArray.push(`offset=${offset}`);
-    }
-    if (sort) {
-        paramsArray.push(`sort=${sort}`);
-    }
-    if (fields) {
-        paramsArray.push(`fields=${fields}`);
-    }
-
+    const paramsArray = [];
+    if (filters) paramsArray.push(`where=${filters}`);
+    if (limit) paramsArray.push(`limit=${limit}`);
+    if (offset) paramsArray.push(`offset=${offset}`);
+    if (sort) paramsArray.push(`sort=${sort}`);
+    if (fields) paramsArray.push(`fields=${fields}`);
     const queryString = paramsArray.join("&");
-    const response = await nocodbClient.get(`/api/v2/tables/${tableId}/records?${queryString}`,);
-    return {
-        input: {
-            tableName,
-            filters,
-            limit,
-            offset,
-            sort,
-            fields
-        },
-        output: response.data
-    };
+    const response = await nocodbClient.get(`/api/v2/tables/${tableId}/records?${queryString}`);
+    return { input: { tableName, filters, limit, offset, sort, fields }, output: response.data };
 }
-
 export async function postRecords(tableName: string, data: unknown) {
     const tableId = await getTableId(tableName);
     const response = await nocodbClient.post(`/api/v2/tables/${tableId}/records`, data);
-    return {
-        output: response.data,
-        input: data
-    };
+    return { output: response.data, input: data };
 }
-
 export async function patchRecords(tableName: string, rowId: number, data: any) {
     const tableId = await getTableId(tableName);
-    const newData = [{
-        ...data,
-        "Id": rowId,
-    }]
-
+    const newData = [{ ...data, "Id": rowId }];
     const response = await nocodbClient.patch(`/api/v2/tables/${tableId}/records`, newData);
-    return {
-        output: response.data,
-        input: data
-    };
+    return { output: response.data, input: data };
 }
-
 export async function deleteRecords(tableName: string, rowId: number) {
     const tableId = await getTableId(tableName);
-    const data: any =
-        {
-            "Id": rowId
-        }
-    const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records`, {data});
-    return response.data;
+    const data: any = { "Id": rowId };
+    const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records`, { data });
+    return response.data; // NocoDB retourne souvent un booléen ou un compte ici
 }
-
 export const getTableId = async (tableName: string): Promise<string> => {
     try {
         const response = await nocodbClient.get(`/api/v2/meta/bases/${NOCODB_BASE_ID}/tables`);
@@ -176,7 +130,6 @@ export const getTableId = async (tableName: string): Promise<string> => {
         throw new Error(`Error retrieving table ID: ${error.message}`);
     }
 };
-
 export async function getListTables() {
     try {
         const response = await nocodbClient.get(`/api/v2/meta/bases/${NOCODB_BASE_ID}/tables`);
@@ -186,86 +139,60 @@ export async function getListTables() {
         throw new Error(`Error get list tables: ${error.message}`);
     }
 }
-
 export async function getTableMetadata(tableName: string) {
     try {
         const tableId = await getTableId(tableName);
         const response = await nocodbClient.get(`/api/v2/meta/tables/${tableId}`);
         return response.data;
     } catch (error: any) {
-        throw new Error(`Error adding column: ${error.message}`);
+        throw new Error(`Error getting table metadata: ${error.message}`); // Correction message erreur
     }
 }
-
-
-// column type
-
-// SingleLineText
-// Number
-// Decimals
-// DateTime
-// Checkbox
 export async function alterTableAddColumn(tableName: string, columnName: string, columnType: string) {
     try {
         const tableId = await getTableId(tableName);
-        const response = await nocodbClient.post(`/api/v2/meta/tables/${tableId}/columns`, {
-            title: columnName,
-            uidt: columnType,
-        });
+        const response = await nocodbClient.post(`/api/v2/meta/tables/${tableId}/columns`, { title: columnName, uidt: columnType });
         return response.data;
     } catch (error: any) {
         throw new Error(`Error adding column: ${error.message}`);
     }
 }
-
 export async function alterTableRemoveColumn(columnId: string) {
     try {
         const response = await nocodbClient.delete(`/api/v2/meta/columns/${columnId}`);
         return response.data;
     } catch (error: any) {
-        throw new Error(`Error remove column: ${error.message}`);
+        throw new Error(`Error removing column: ${error.message}`); // Correction message erreur
     }
 }
-
 type ColumnType = "SingleLineText" | "Number" | "Checkbox" | "DateTime" | "ID";
-type TableColumnType = {
-    title: string;
-    uidt: ColumnType
-}
-
+type TableColumnType = { title: string; uidt: ColumnType };
 export async function createTable(tableName: string, data: TableColumnType[]) {
     try {
-
-        const hasId = data.filter(x => x.title === "Id").length > 0
+        const hasId = data.some(x => x.title === "Id"); // Utiliser some pour vérifier l'existence
         if (!hasId) {
-            // insert at first
-            data.unshift({
-                title: "Id",
-                uidt: "ID"
-            })
+            data.unshift({ title: "Id", uidt: "ID" });
         }
-
         const response = await nocodbClient.post(`/api/v2/meta/bases/${NOCODB_BASE_ID}/tables`, {
             title: tableName,
-            columns: data.map((value) => ({
-                title: value.title,
-                uidt: value.uidt
-            })),
+            columns: data.map((value) => ({ title: value.title, uidt: value.uidt })),
         });
         return response.data;
     } catch (error: any) {
         throw new Error(`Error creating table: ${error.message}`);
     }
 }
+// --- Fin des fonctions NocoDB ---
 
 
-// Create an MCP server
+// --- Création Serveur MCP ---
 const server = new McpServer({
     name: "nocodb-mcp-server",
     version: "1.0.0"
 });
+// --- Fin Création Serveur MCP ---
 
-// Construire manuellement l'objet capabilities.tools avec des JSON Schemas standards
+// --- Définition Statique des Capabilities (avec JSON Schema) ---
 const staticToolsCapabilities = {
     "nocodb-get-records": {
         description: "Nocodb - Get Records" + `hint:\n    1. Get all records from a table (limited to 10):\n       retrieve_records(table_name=\"customers\")\n       \n    3. Filter records with conditions:\n       retrieve_records(\n           table_name=\"customers\", \n           filters=\"(age,gt,30)~and(status,eq,active)\"\n       )\n       \n    4. Paginate results:\n       retrieve_records(table_name=\"customers\", limit=20, offset=40)\n       \n    5. Sort results:\n       retrieve_records(table_name=\"customers\", sort=\"-created_at\")\n       \n    6. Select specific fields:\n       retrieve_records(table_name=\"customers\", fields=\"id,name,email\")\n`,
@@ -284,7 +211,7 @@ const staticToolsCapabilities = {
     },
     "nocodb-get-list-tables": {
         description: "Nocodb - Get List Tables\nnotes: only show result from output to user",
-        inputSchema: { type: "object", properties: {} } // Schéma vide pour aucun argument
+        inputSchema: { type: "object", properties: {} }
     },
     "nocodb-post-records": {
         description: "Nocodb - Post Records",
@@ -292,7 +219,7 @@ const staticToolsCapabilities = {
           type: "object",
           properties: {
             tableName: { type: "string", description: "table name" },
-            data: true // Utiliser 'true' pour représenter 'any' en JSON Schema standard
+            data: true // Représente 'any'
           },
           required: ["tableName", "data"]
         }
@@ -304,7 +231,7 @@ const staticToolsCapabilities = {
           properties: {
             tableName: { type: "string" },
             rowId: { type: "number" },
-            data: true // Utiliser 'true' pour représenter 'any' en JSON Schema standard
+            data: true // Représente 'any'
           },
           required: ["tableName", "rowId", "data"]
         }
@@ -364,7 +291,7 @@ const staticToolsCapabilities = {
                 type: "object",
                 properties: {
                   title: { type: "string" },
-                  "uidt": { type: "string", enum: ["SingleLineText", "Number", "Checkbox", "DateTime"], description: "SingleLineText, Number, Checkbox, DateTime" } // Correction: guillemets autour de uidt
+                  "uidt": { type: "string", enum: ["SingleLineText", "Number", "Checkbox", "DateTime"], description: "SingleLineText, Number, Checkbox, DateTime" }
                 },
                 required: ["title", "uidt"]
               },
@@ -375,517 +302,275 @@ const staticToolsCapabilities = {
         }
     }
 };
+// --- Fin Définition Statique ---
 
 
 async function main() {
 
-    // Les déclarations server.tool restent ici pour enregistrer les handlers
+    // --- Enregistrement des Outils avec server.tool() ---
     server.tool("nocodb-get-records",
-        "Nocodb - Get Records" +
-        `hint:
-    1. Get all records from a table (limited to 10):
-       retrieve_records(table_name="customers")
-       
-    3. Filter records with conditions:
-       retrieve_records(
-           table_name="customers", 
-           filters="(age,gt,30)~and(status,eq,active)"
-       )
-       
-    4. Paginate results:
-       retrieve_records(table_name="customers", limit=20, offset=40)
-       
-    5. Sort results:
-       retrieve_records(table_name="customers", sort="-created_at")
-       
-    6. Select specific fields:
-       retrieve_records(table_name="customers", fields="id,name,email")
-`,
+        staticToolsCapabilities["nocodb-get-records"].description,
+        // On passe le schéma Zod ici pour la validation interne du SDK si besoin
         {
             tableName: z.string(),
-            filters: z.string().optional().describe(
-                `Example: where=(field1,eq,value1)~and(field2,eq,value2) will filter records where 'field1' is equal to 'value1' AND 'field2' is equal to 'value2'.
-You can also use other comparison operators like 'ne' (not equal), 'gt' (greater than), 'lt' (less than), and more, to create complex filtering rules.
-` + " " + filterRules),
+            filters: z.string().optional(),
             limit: z.number().optional(),
             offset: z.number().optional(),
-            sort: z.string().optional().describe("Example: sort=field1,-field2 will sort the records first by 'field1' in ascending order and then by 'field2' in descending order."),
-            fields: z.string().optional().describe("Example: fields=field1,field2 will include only 'field1' and 'field2' in the API response."),
+            sort: z.string().optional(),
+            fields: z.string().optional(),
         },
-        async ({tableName, filters, limit, offset, sort, fields}) => {
+        async ({ tableName, filters, limit, offset, sort, fields }) => {
             console.log("[TOOL] nocodb-get-records called with:", { tableName, filters, limit, offset, sort, fields });
             try {
                 const response = await getRecords(tableName, filters, limit, offset, sort, fields);
                 console.log("[TOOL] nocodb-get-records response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-get-records error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
 
-    server.tool(
-        "nocodb-get-list-tables",
-        `Nocodb - Get List Tables
-notes: only show result from output to user
-`,
-        {},
+    server.tool("nocodb-get-list-tables",
+        staticToolsCapabilities["nocodb-get-list-tables"].description,
+        {}, // Pas d'arguments Zod ici car inputSchema est vide
         async () => {
             console.log("[TOOL] nocodb-get-list-tables called");
             try {
-                const response = await getListTables()
+                const response = await getListTables();
                 console.log("[TOOL] nocodb-get-list-tables response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-get-list-tables error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
-    )
+    );
 
-    server.tool(
-        "nocodb-post-records",
-        "Nocodb - Post Records",
-        {
-            tableName: z.string().describe("table name"),
-            data: z.any()
-                .describe(`The data to be inserted into the table. 
-[WARNING] The structure of this object should match the columns of the table.
-example:
-const response = await postRecords("Shinobi", {
-        Title: "sasuke"
-})`)
-        },
-        async ({tableName, data}) => {
+    server.tool("nocodb-post-records",
+        staticToolsCapabilities["nocodb-post-records"].description,
+        { tableName: z.string(), data: z.any() }, // Schéma Zod pour validation interne
+        async ({ tableName, data }) => {
             console.log("[TOOL] nocodb-post-records called with:", { tableName, data });
             try {
-                const response = await postRecords(tableName, data)
+                const response = await postRecords(tableName, data);
                 console.log("[TOOL] nocodb-post-records response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-post-records error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
-
 
     server.tool("nocodb-patch-records",
-        "Nocodb - Patch Records",
-        {
-            tableName: z.string(),
-            rowId: z.number(),
-            data: z.any().describe(`The data to be updated in the table.
-[WARNING] The structure of this object should match the columns of the table.
-example:
-const response = await patchRecords("Shinobi", 2, {
-            Title: "sasuke-updated"
-})`)
-        },
-        async ({tableName, rowId, data}) => {
+        staticToolsCapabilities["nocodb-patch-records"].description,
+        { tableName: z.string(), rowId: z.number(), data: z.any() }, // Schéma Zod
+        async ({ tableName, rowId, data }) => {
             console.log("[TOOL] nocodb-patch-records called with:", { tableName, rowId, data });
             try {
-                const response = await patchRecords(tableName, rowId, data)
+                const response = await patchRecords(tableName, rowId, data);
                 console.log("[TOOL] nocodb-patch-records response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-patch-records error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
 
-    server.tool("nocodb-delete-records",
-        "Nocodb - Delete Records",
-        {tableName: z.string(), rowId: z.number()},
-        async ({tableName, rowId}) => {
+     server.tool("nocodb-delete-records",
+        staticToolsCapabilities["nocodb-delete-records"].description,
+        { tableName: z.string(), rowId: z.number() }, // Schéma Zod
+        async ({ tableName, rowId }) => {
             console.log("[TOOL] nocodb-delete-records called with:", { tableName, rowId });
             try {
-                const response = await deleteRecords(tableName, rowId)
+                const response = await deleteRecords(tableName, rowId);
                 console.log("[TOOL] nocodb-delete-records response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-delete-records error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
 
-    server.tool("nocodb-get-table-metadata",
-        "Nocodb - Get Table Metadata",
-        {tableName: z.string()},
-        async ({tableName}) => {
+     server.tool("nocodb-get-table-metadata",
+        staticToolsCapabilities["nocodb-get-table-metadata"].description,
+        { tableName: z.string() }, // Schéma Zod
+        async ({ tableName }) => {
             console.log("[TOOL] nocodb-get-table-metadata called with:", { tableName });
             try {
-                const response = await getTableMetadata(tableName)
+                const response = await getTableMetadata(tableName);
                 console.log("[TOOL] nocodb-get-table-metadata response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-get-table-metadata error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
 
-    server.tool("nocodb-alter-table-add-column",
-        "Nocodb - Alter Table Add Column",
-        {
-            tableName: z.string(),
-            columnName: z.string(),
-            columnType: z.string().describe("SingleLineText, Number, Decimals, DateTime, Checkbox")
-        },
-        async ({tableName, columnName, columnType}) => {
+     server.tool("nocodb-alter-table-add-column",
+        staticToolsCapabilities["nocodb-alter-table-add-column"].description,
+        { tableName: z.string(), columnName: z.string(), columnType: z.string() }, // Schéma Zod
+        async ({ tableName, columnName, columnType }) => {
             console.log("[TOOL] nocodb-alter-table-add-column called with:", { tableName, columnName, columnType });
             try {
-                const response = await alterTableAddColumn(tableName, columnName, columnType)
+                const response = await alterTableAddColumn(tableName, columnName, columnType);
                 console.log("[TOOL] nocodb-alter-table-add-column response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-alter-table-add-column error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
 
-    server.tool("nocodb-alter-table-remove-column",
-        "Nocodb - Alter Table Remove Column" +
-        " get columnId from getTableMetadata" +
-        " notes: remove column by columnId" +
-        " example: c7uo2ruwc053a3a" +
-        " [WARNING] this action is irreversible" +
-        " [RECOMMENDATION] give warning to user",
-        {columnId: z.string()},
-        async ({columnId}) => {
+     server.tool("nocodb-alter-table-remove-column",
+        staticToolsCapabilities["nocodb-alter-table-remove-column"].description,
+        { columnId: z.string() }, // Schéma Zod
+        async ({ columnId }) => {
             console.log("[TOOL] nocodb-alter-table-remove-column called with:", { columnId });
             try {
-                const response = await alterTableRemoveColumn(columnId)
+                const response = await alterTableRemoveColumn(columnId);
                 console.log("[TOOL] nocodb-alter-table-remove-column response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-alter-table-remove-column error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
 
-    server.tool("nocodb-create-table",
-        "Nocodb - Create Table",
-        {
-            tableName: z.string(),
-            data: z.array(z.object({
-                title: z.string(),
-                uidt: z.enum(["SingleLineText", "Number", "Checkbox", "DateTime"]).describe("SingleLineText, Number, Checkbox, DateTime")
-
-            }).describe(`The data to be inserted into the table.
-[WARNING] The structure of this object should match the columns of the table.
-example:
-const response = await createTable("Shinobi", [
-        {
-            title: "Name",
-            uidt: "SingleLineText"
-        },
-        {
-            title: "Age",
-            uidt: "Number"
-        },
-        {
-            title: "isHokage",
-            uidt: "Checkbox"
-        },
-        {
-            title: "Birthday",
-            uidt: "DateTime"
-        }
-    ]
-)`))
-        },
-        async ({tableName, data}) => {
+     server.tool("nocodb-create-table",
+        staticToolsCapabilities["nocodb-create-table"].description,
+        { tableName: z.string(), data: z.array(z.object({ title: z.string(), uidt: z.enum(["SingleLineText", "Number", "Checkbox", "DateTime"]) })) }, // Schéma Zod
+        async ({ tableName, data }) => {
             console.log("[TOOL] nocodb-create-table called with:", { tableName, data });
             try {
-                const response = await createTable(tableName, data)
+                const response = await createTable(tableName, data);
                 console.log("[TOOL] nocodb-create-table response:", response);
-                return {
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify(response),
-                    }],
-                }
+                return { content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify(response) }] };
             } catch (error: any) {
                 console.error("[TOOL] nocodb-create-table error:", error);
-                return {
-                    isError: true,
-                    error: error?.message || String(error),
-                    content: [{
-                        type: 'text',
-                        mimeType: 'application/json',
-                        text: JSON.stringify({ error: error?.message || String(error) })
-                    }]
-                };
+                return { isError: true, error: error?.message || String(error), content: [{ type: 'text', mimeType: 'application/json', text: JSON.stringify({ error: error?.message || String(error) }) }] };
             }
         }
     );
+    // --- Fin Enregistrement Outils ---
 
 
-    // Add a dynamic greeting resource
-    server.resource(
-        "greeting",
-        new ResourceTemplate("greeting://{name}", {list: undefined}),
-        async (uri, {name}) => ({
-            contents: [{
-                uri: uri.href,
-                text: `Hello, ${name}!`
-            }]
-        })
-    );
-
-    // ---> Début : Implémentation Serveur HTTP/SSE <---
+    // --- Démarrage Serveur Express + SSE ---
     const app = express();
-    app.use(cors()); // Active CORS (Cross-Origin Resource Sharing)
-    app.use(express.json()); // Active le parsing des corps de requête JSON pour la route POST /messages
+    app.use(cors());
+    app.use(express.json());
 
-    // Dictionnaire pour stocker les transports actifs par ID de session
-    const transports: {[sessionId: string]: SSEServerTransport} = {};
+    const transports: { [sessionId: string]: SSEServerTransport } = {};
 
-    // Endpoint pour les connexions SSE (Server-Sent Events)
     app.get("/sse", async (req: Request, res: Response) => {
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] Nouvelle requête de connexion SSE reçue.`);
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] Nouvelle requête de connexion SSE reçue.`);
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
 
-      // Headers requis pour SSE
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
-      // res.flushHeaders(); // Envoie les headers immédiatement
+        const transport = new SSEServerTransport('/messages', res);
+        const sessionId = transport.sessionId;
+        transports[sessionId] = transport;
+        console.log(`[${timestamp}] Transport SSE créé pour la session : ${sessionId}`);
 
-      // Crée un nouveau transport SSE pour cette connexion spécifique
-      // Le '/messages' indique au client où envoyer les messages via POST
-      const transport = new SSEServerTransport('/messages', res);
-      const sessionId = transport.sessionId;
-      transports[sessionId] = transport; // Enregistre le transport
-      console.log(`[${timestamp}] Transport SSE créé pour la session : ${sessionId}`);
+        res.on("close", () => {
+            const closeTimestamp = new Date().toISOString();
+            console.log(`[${closeTimestamp}] Connexion SSE fermée pour la session : ${sessionId}`);
+            delete transports[sessionId];
+        });
 
-      // Gestion de la déconnexion client
-      res.on("close", () => {
-        const closeTimestamp = new Date().toISOString();
-        console.log(`[${closeTimestamp}] Connexion SSE fermée pour la session : ${sessionId}`);
-        delete transports[sessionId]; // Nettoie le transport
-        // Note: Vérifier si transport.close() ou une méthode similaire existe dans le SDK pour un nettoyage plus propre
-      });
-
-      // Envoi périodique de commentaires pour maintenir la connexion ouverte (évite certains timeouts proxy)
-      const keepAliveInterval = setInterval(() => {
-        if (!res.writableEnded) {
-            res.write(': keep-alive\n\n'); // Envoie un commentaire SSE
-        } else {
-            // Arrête si la connexion est déjà fermée
-            clearInterval(keepAliveInterval);
-        }
-      }, 25000); // Toutes les 25 secondes
-
-      // Connecte la logique du serveur MCP à cette instance de transport
-      try {
-          await server.connect(transport);
-          console.log(`[${new Date().toISOString()}] McpServer connecté au transport pour la session : ${sessionId}`);
-      } catch (error) {
-          console.error(`[${new Date().toISOString()}] Erreur lors de la connexion de McpServer au transport ${sessionId}:`, error);
-          clearInterval(keepAliveInterval); // Arrête le keep-alive en cas d'erreur
-          if (!res.writableEnded) {
-              // Termine la réponse si une erreur survient pendant la connexion
-              res.status(500).end();
-          }
-      }
-    });
-
-    // Endpoint pour recevoir les messages envoyés par le client via POST
-    app.post("/messages", async (req: Request, res: Response) => {
-      const sessionId = req.query.sessionId as string; // L'ID de session est requis dans l'URL (?sessionId=...)
-      const transport = transports[sessionId]; // Trouve le transport correspondant
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] POST reçu sur /messages pour la session : ${sessionId}`);
-
-      // ---> AJOUT : Logguer le corps de la requête reçue <---
-      console.log(`[${timestamp}] POST /messages Body brut reçu :`, JSON.stringify(req.body));
-      // ---> FIN AJOUT <---
-
-      // Interception manuelle de la requête d'initialisation MCP
-      if (req.body && req.body.method === "initialize") {
-        console.log(`[${timestamp}] Tentative de gestion manuelle de l'initialisation`);
-        try {
-          // Utiliser l'objet capabilities statique construit au démarrage
-          const response = {
-            jsonrpc: "2.0",
-            id: req.body.id,
-            result: {
-              protocolVersion: req.body.params.protocolVersion, // Utiliser la version demandée par le client
-              serverInfo: {
-                name: "nocodb-mcp-server", // Utiliser la valeur statique
-                version: "1.0.0" // Utiliser la valeur statique
-              },
-              capabilities: {
-                tools: staticToolsCapabilities // Utilisation de l'objet statique
-              }
+        const keepAliveInterval = setInterval(() => {
+            if (!res.writableEnded) {
+                res.write(': keep-alive\n\n');
+            } else {
+                clearInterval(keepAliveInterval);
             }
-          };
-          // Log de la réponse envoyée (sans les détails des schémas pour la lisibilité)
-          console.log(`[${timestamp}] Réponse d'initialisation manuelle (statique) envoyée pour ID ${req.body.id}`);
-          res.json(response);
-          return; // Important: sortir de la fonction après avoir répondu
-        } catch (error) {
-          console.error(`[${timestamp}] Erreur lors de la réponse manuelle (statique):`, error);
-           if (!res.headersSent) {
-             // Renvoyer une erreur MCP structurée
-             res.status(500).json({ jsonrpc: "2.0", id: req.body.id, error: { code: -32000, message: "Erreur interne lors de la construction de la réponse d'initialisation" } });
-           }
-        }
-      }
+        }, 25000);
 
-      if (transport) {
         try {
-          // Délègue la gestion de TOUS les messages (y compris initialize) au transport SSE approprié
-          await transport.handlePostMessage(req, res);
-          // handlePostMessage devrait gérer l'envoi de la réponse HTTP au client
+            await server.connect(transport);
+            console.log(`[${new Date().toISOString()}] McpServer connecté au transport pour la session : ${sessionId}`);
         } catch (error) {
-          console.error(`[${timestamp}] Erreur lors du traitement du message POST pour la session ${sessionId}:`, error);
-          // Tente d'envoyer une réponse d'erreur si possible
-          if (!res.headersSent) {
-            res.status(500).send('Erreur lors du traitement du message');
-          } else if (!res.writableEnded){
-            res.end(); // Termine la connexion si les headers sont déjà envoyés
-          }
+            console.error(`[${new Date().toISOString()}] Erreur lors de la connexion de McpServer au transport ${sessionId}:`, error);
+            clearInterval(keepAliveInterval);
+            if (!res.writableEnded) {
+                res.status(500).end();
+            }
         }
-      } else {
-        // Aucun transport trouvé pour cet ID de session
-        console.error(`[${timestamp}] Aucun transport trouvé pour la session ${sessionId} dans la requête POST /messages.`);
-        res.status(400).send('Aucun transport trouvé pour cet ID de session (sessionId manquant ou invalide dans les query params ?)');
-      }
     });
 
-    // Définition du port d'écoute, priorité à la variable d'environnement PORT, sinon 3000 par défaut
+    app.post("/messages", async (req: Request, res: Response) => {
+        const sessionId = req.query.sessionId as string;
+        const transport = transports[sessionId];
+        const timestamp = new Date().toISOString();
+        console.log(`[${timestamp}] POST reçu sur /messages pour la session : ${sessionId}`);
+        console.log(`[${timestamp}] POST /messages Body brut reçu :`, JSON.stringify(req.body));
+
+        // Interception manuelle de la requête d'initialisation MCP
+        if (req.body && req.body.method === "initialize") {
+            console.log(`[${timestamp}] Tentative de gestion manuelle de l'initialisation`);
+            try {
+                // Utiliser l'objet capabilities statique construit au démarrage
+                const response = {
+                    jsonrpc: "2.0",
+                    id: req.body.id,
+                    result: {
+                        protocolVersion: req.body.params.protocolVersion, // Utiliser la version demandée par le client
+                        serverInfo: {
+                            name: "nocodb-mcp-server", // Utiliser la valeur statique
+                            version: "1.0.0" // Utiliser la valeur statique
+                        },
+                        capabilities: {
+                            tools: staticToolsCapabilities // Utilisation de l'objet statique avec JSON Schemas
+                        }
+                    }
+                };
+                console.log(`[${timestamp}] Réponse d'initialisation manuelle (statique) envoyée pour ID ${req.body.id}`);
+                res.json(response);
+                return; // Important: sortir de la fonction après avoir répondu
+            } catch (error) {
+                console.error(`[${timestamp}] Erreur lors de la réponse manuelle (statique):`, error);
+                if (!res.headersSent) {
+                    res.status(500).json({ jsonrpc: "2.0", id: req.body.id, error: { code: -32000, message: "Erreur interne lors de la construction de la réponse d'initialisation" } });
+                }
+            }
+        }
+
+        // Gérer les autres messages (ex: callTool) via le SDK
+        if (transport) {
+            try {
+                await transport.handlePostMessage(req, res); // Le SDK devrait router vers les handlers server.tool
+            } catch (error) {
+                console.error(`[${timestamp}] Erreur lors du traitement du message POST par le SDK pour la session ${sessionId}:`, error);
+                if (!res.headersSent) {
+                    res.status(500).send('Erreur lors du traitement du message par le SDK');
+                } else if (!res.writableEnded) {
+                    res.end();
+                }
+            }
+        } else {
+            console.error(`[${timestamp}] Aucun transport trouvé pour la session ${sessionId} dans la requête POST /messages.`);
+            res.status(400).send('Aucun transport trouvé pour cet ID de session (sessionId manquant ou invalide dans les query params ?)');
+        }
+    });
+
     const PORT = parseInt(process.env.PORT || "3000", 10);
-
-    // Démarrage du serveur Express qui écoute sur le port défini
-    app.listen(PORT, '0.0.0.0', () => { // Écoute sur 0.0.0.0 pour être accessible depuis Docker
-      const startTimestamp = new Date().toISOString();
-      console.log(`[${startTimestamp}] Serveur MCP (HTTP/SSE) démarré.`);
-      console.log(`[${startTimestamp}] Écoute sur le port : ${PORT}`);
-      console.log(`[${startTimestamp}] Endpoint SSE disponible sur : http://<votre-ip>:${PORT}/sse`);
-      console.log(`[${startTimestamp}] Endpoint pour messages client : POST http://<votre-ip>:${PORT}/messages?sessionId=<ID>`);
+    app.listen(PORT, '0.0.0.0', () => {
+        const startTimestamp = new Date().toISOString();
+        console.log(`[${startTimestamp}] Serveur MCP (HTTP/SSE) démarré.`);
+        console.log(`[${startTimestamp}] Écoute sur le port : ${PORT}`);
+        console.log(`[${startTimestamp}] Endpoint SSE disponible sur : http://<votre-ip>:${PORT}/sse`);
+        console.log(`[${startTimestamp}] Endpoint pour messages client : POST http://<votre-ip>:${PORT}/messages?sessionId=<ID>`);
     });
-    // ---> Fin : Implémentation Serveur HTTP/SSE <---
+    // --- Fin Démarrage Serveur ---
 }
 
 void main();
