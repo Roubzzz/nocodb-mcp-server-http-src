@@ -533,7 +533,10 @@ const response = await createTable("Shinobi", [
       // Gestion de la déconnexion client
       res.on("close", () => {
         const closeTimestamp = new Date().toISOString();
-        console.log(`[${closeTimestamp}] Connexion SSE fermée pour la session : ${sessionId}`);
+        // Log additional details about the response state at the time of closure
+        console.log(`[${closeTimestamp}] Connexion SSE fermée pour la session : ${sessionId}. Headers Sent: ${res.headersSent}, Writable Ended: ${res.writableEnded}`);
+        // Stop the keep-alive interval when the connection closes
+        clearInterval(keepAliveInterval);
         delete transports[sessionId]; // Nettoie le transport
         // Note: Vérifier si transport.close() ou une méthode similaire existe dans le SDK pour un nettoyage plus propre
       });
@@ -570,12 +573,14 @@ const response = await createTable("Shinobi", [
       console.log(`[${timestamp}] POST reçu sur /messages pour la session : ${sessionId}`);
 
       if (transport) {
+        console.log(`[${timestamp}] Début du traitement du message POST pour la session ${sessionId}...`);
         try {
           // Délègue la gestion du message au transport SSE approprié
           await transport.handlePostMessage(req, res);
           // handlePostMessage devrait gérer l'envoi de la réponse HTTP au client
+          console.log(`[${new Date().toISOString()}] Fin du traitement du message POST (handlePostMessage terminé) pour la session ${sessionId}. Headers Sent: ${res.headersSent}, Writable Ended: ${res.writableEnded}`);
         } catch (error) {
-          console.error(`[${timestamp}] Erreur lors du traitement du message POST pour la session ${sessionId}:`, error);
+          console.error(`[${new Date().toISOString()}] Erreur DANS handlePostMessage pour la session ${sessionId}:`, error);
           // Tente d'envoyer une réponse d'erreur si possible
           if (!res.headersSent) {
             res.status(500).send('Erreur lors du traitement du message');
