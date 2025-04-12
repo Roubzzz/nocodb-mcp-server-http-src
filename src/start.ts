@@ -147,7 +147,7 @@ export async function patchRecords(tableName: string, rowId: number, data: any) 
     console.log(`[patchRecords] Resolved tableId: ${tableId} for tableName: ${tableName}`);
     const newData = [{
         ...data,
-        "Id": rowId,
+        "Id": String(rowId), // Ensure Id is sent as a string in the payload
     }]
     const requestUrl = `/api/v2/tables/${tableId}/records`;
     console.log(`[patchRecords] Attempting PATCH request to URL: ${nocodbClient.defaults.baseURL}${requestUrl}`);
