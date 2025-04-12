@@ -708,6 +708,33 @@ const response = await createTable("Shinobi", [
       console.log(`[${timestamp}] POST /messages Body brut reçu :`, JSON.stringify(req.body));
       // ---> FIN AJOUT <---
 
+      // Interception manuelle de la requête d'initialisation MCP
+      if (req.body && req.body.method === "initialize") {
+        console.log(`[${timestamp}] Tentative de gestion manuelle de l'initialisation`);
+        try {
+          // Répondre manuellement à l'initialisation avec la même version de protocole
+          const response = {
+            jsonrpc: "2.0",
+            id: req.body.id,
+            result: {
+              protocolVersion: req.body.params.protocolVersion,
+              serverInfo: {
+                name: "nocodb-mcp-server",
+                version: "1.0.0"
+              },
+              capabilities: {
+                tools: true
+              }
+            }
+          };
+          console.log(`[${timestamp}] Réponse d'initialisation manuelle:`, JSON.stringify(response));
+          res.json(response);
+          return; // Important: sortir de la fonction après avoir répondu
+        } catch (error) {
+          console.error(`[${timestamp}] Erreur lors de la réponse manuelle:`, error);
+        }
+      }
+
       if (transport) {
         try {
           // Délègue la gestion du message au transport SSE approprié
