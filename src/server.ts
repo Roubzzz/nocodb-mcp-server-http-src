@@ -24,7 +24,7 @@ export function startHttpServer(mcpServer: McpServer) {
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
-        res.flushHeaders(); // Send headers immediately
+        // res.flushHeaders(); // REMOVED: Let the transport handle flushing upon connection
 
         // Create a new SSE transport for this connection
         // '/messages' tells the client where to POST messages back
