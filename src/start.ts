@@ -300,7 +300,9 @@ You can also use other comparison operators like 'ne' (not equal), 'gt' (greater
             fields: z.string().optional().describe("Example: fields=field1,field2 will include only 'field1' and 'field2' in the API response."),
         },
         async ({tableName, filters, limit, offset, sort, fields}) => {
+            console.log("[TOOL] nocodb-get-records called with:", { tableName, filters, limit, offset, sort, fields });
             const response = await getRecords(tableName, filters, limit, offset, sort, fields);
+            console.log("[TOOL] nocodb-get-records response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -318,7 +320,9 @@ notes: only show result from output to user
 `,
         {},
         async () => {
+            console.log("[TOOL] nocodb-get-list-tables called");
             const response = await getListTables()
+            console.log("[TOOL] nocodb-get-list-tables response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -343,7 +347,9 @@ const response = await postRecords("Shinobi", {
 })`)
         },
         async ({tableName, data}) => {
+            console.log("[TOOL] nocodb-post-records called with:", { tableName, data });
             const response = await postRecords(tableName, data)
+            console.log("[TOOL] nocodb-post-records response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -368,7 +374,9 @@ const response = await patchRecords("Shinobi", 2, {
 })`)
         },
         async ({tableName, rowId, data}) => {
+            console.log("[TOOL] nocodb-patch-records called with:", { tableName, rowId, data });
             const response = await patchRecords(tableName, rowId, data)
+            console.log("[TOOL] nocodb-patch-records response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -383,7 +391,9 @@ const response = await patchRecords("Shinobi", 2, {
         "Nocodb - Delete Records",
         {tableName: z.string(), rowId: z.number()},
         async ({tableName, rowId}) => {
+            console.log("[TOOL] nocodb-delete-records called with:", { tableName, rowId });
             const response = await deleteRecords(tableName, rowId)
+            console.log("[TOOL] nocodb-delete-records response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -398,7 +408,9 @@ const response = await patchRecords("Shinobi", 2, {
         "Nocodb - Get Table Metadata",
         {tableName: z.string()},
         async ({tableName}) => {
+            console.log("[TOOL] nocodb-get-table-metadata called with:", { tableName });
             const response = await getTableMetadata(tableName)
+            console.log("[TOOL] nocodb-get-table-metadata response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -417,7 +429,9 @@ const response = await patchRecords("Shinobi", 2, {
             columnType: z.string().describe("SingleLineText, Number, Decimals, DateTime, Checkbox")
         },
         async ({tableName, columnName, columnType}) => {
+            console.log("[TOOL] nocodb-alter-table-add-column called with:", { tableName, columnName, columnType });
             const response = await alterTableAddColumn(tableName, columnName, columnType)
+            console.log("[TOOL] nocodb-alter-table-add-column response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -437,7 +451,9 @@ const response = await patchRecords("Shinobi", 2, {
         " [RECOMMENDATION] give warning to user",
         {columnId: z.string()},
         async ({columnId}) => {
+            console.log("[TOOL] nocodb-alter-table-remove-column called with:", { columnId });
             const response = await alterTableRemoveColumn(columnId)
+            console.log("[TOOL] nocodb-alter-table-remove-column response:", response);
             return {
                 content: [{
                     type: 'text',
@@ -480,7 +496,9 @@ const response = await createTable("Shinobi", [
 )`))
         },
         async ({tableName, data}) => {
+            console.log("[TOOL] nocodb-create-table called with:", { tableName, data });
             const response = await createTable(tableName, data)
+            console.log("[TOOL] nocodb-create-table response:", response);
             return {
                 content: [{
                     type: 'text',
