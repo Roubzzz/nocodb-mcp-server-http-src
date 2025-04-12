@@ -714,6 +714,7 @@ const response = await createTable("Shinobi", [
         try {
           // Générer dynamiquement la liste des outils exposés
           const toolsObj: Record<string, any> = {};
+          console.log(`[${timestamp}] DEBUG: Contenu de server._tools:`, JSON.stringify((server as any)._tools)); // LOG AJOUTÉ
           for (const [toolName, toolDef] of Object.entries((server as any)._tools)) {
             // Cast toolDef to any to access properties
             const toolDefinition = toolDef as any;
@@ -722,6 +723,7 @@ const response = await createTable("Shinobi", [
               inputSchema: toolDefinition.inputSchema
             };
           }
+          console.log(`[${timestamp}] DEBUG: toolsObj généré:`, JSON.stringify(toolsObj)); // LOG AJOUTÉ
           // Répondre manuellement à l'initialisation avec la même version de protocole
           const response = {
             jsonrpc: "2.0",
@@ -733,15 +735,20 @@ const response = await createTable("Shinobi", [
                 version: "1.0.0"
               },
               capabilities: {
-                tools: toolsObj
+                tools: toolsObj // Utilisation de l'objet généré
               }
             }
           };
+          console.log(`[${timestamp}] DEBUG: capabilities.tools final:`, JSON.stringify(response.result.capabilities.tools)); // LOG AJOUTÉ
           console.log(`[${timestamp}] Réponse d'initialisation manuelle:`, JSON.stringify(response));
           res.json(response);
           return; // Important: sortir de la fonction après avoir répondu
         } catch (error) {
           console.error(`[${timestamp}] Erreur lors de la réponse manuelle:`, error);
+          // En cas d'erreur ici, renvoyer une réponse d'erreur simple
+           if (!res.headersSent) {
+             res.status(500).json({ jsonrpc: "2.0", id: req.body.id, error: { code: -32000, message: "Erreur interne lors de la génération des capabilities" } });
+           }
         }
       }
 
