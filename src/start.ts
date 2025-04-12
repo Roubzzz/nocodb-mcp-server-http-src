@@ -265,46 +265,115 @@ const server = new McpServer({
     version: "1.0.0"
 });
 
-// Construire manuellement l'objet capabilities.tools au démarrage
+// Construire manuellement l'objet capabilities.tools avec des JSON Schemas standards
 const staticToolsCapabilities = {
     "nocodb-get-records": {
-        description: "Nocodb - Get Records" + `hint: ...`, // Simplifié pour la concision
-        inputSchema: { tableName: z.string(), filters: z.string().optional(), limit: z.number().optional(), offset: z.number().optional(), sort: z.string().optional(), fields: z.string().optional() }
+        description: "Nocodb - Get Records" + `hint:\n    1. Get all records from a table (limited to 10):\n       retrieve_records(table_name=\"customers\")\n       \n    3. Filter records with conditions:\n       retrieve_records(\n           table_name=\"customers\", \n           filters=\"(age,gt,30)~and(status,eq,active)\"\n       )\n       \n    4. Paginate results:\n       retrieve_records(table_name=\"customers\", limit=20, offset=40)\n       \n    5. Sort results:\n       retrieve_records(table_name=\"customers\", sort=\"-created_at\")\n       \n    6. Select specific fields:\n       retrieve_records(table_name=\"customers\", fields=\"id,name,email\")\n`,
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string" },
+            filters: { type: "string", description: `Example: where=(field1,eq,value1)~and(field2,eq,value2) will filter records where 'field1' is equal to 'value1' AND 'field2' is equal to 'value2'.\nYou can also use other comparison operators like 'ne' (not equal), 'gt' (greater than), 'lt' (less than), and more, to create complex filtering rules.\n ${filterRules}` },
+            limit: { type: "number" },
+            offset: { type: "number" },
+            sort: { type: "string", description: "Example: sort=field1,-field2 will sort the records first by 'field1' in ascending order and then by 'field2' in descending order." },
+            fields: { type: "string", description: "Example: fields=field1,field2 will include only 'field1' and 'field2' in the API response." }
+          },
+          required: ["tableName"]
+        }
     },
     "nocodb-get-list-tables": {
         description: "Nocodb - Get List Tables\nnotes: only show result from output to user",
-        inputSchema: {}
+        inputSchema: { type: "object", properties: {} } // Schéma vide pour aucun argument
     },
     "nocodb-post-records": {
         description: "Nocodb - Post Records",
-        inputSchema: { tableName: z.string(), data: z.any() }
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string", description: "table name" },
+            data: { description: "The data to be inserted into the table. \n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await postRecords(\"Shinobi\", {\n        Title: \"sasuke\"\n})" } // {} représente 'any' en JSON Schema
+          },
+          required: ["tableName", "data"]
+        }
     },
     "nocodb-patch-records": {
         description: "Nocodb - Patch Records",
-        inputSchema: { tableName: z.string(), rowId: z.number(), data: z.any() }
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string" },
+            rowId: { type: "number" },
+            data: { description: "The data to be updated in the table.\n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await patchRecords(\"Shinobi\", 2, {\n            Title: \"sasuke-updated\"\n})" }
+          },
+          required: ["tableName", "rowId", "data"]
+        }
     },
     "nocodb-delete-records": {
         description: "Nocodb - Delete Records",
-        inputSchema: { tableName: z.string(), rowId: z.number() }
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string" },
+            rowId: { type: "number" }
+          },
+          required: ["tableName", "rowId"]
+        }
     },
     "nocodb-get-table-metadata": {
         description: "Nocodb - Get Table Metadata",
-        inputSchema: { tableName: z.string() }
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string" }
+          },
+          required: ["tableName"]
+        }
     },
     "nocodb-alter-table-add-column": {
         description: "Nocodb - Alter Table Add Column",
-        inputSchema: { tableName: z.string(), columnName: z.string(), columnType: z.string() }
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string" },
+            columnName: { type: "string" },
+            columnType: { type: "string", description: "SingleLineText, Number, Decimals, DateTime, Checkbox" }
+          },
+          required: ["tableName", "columnName", "columnType"]
+        }
     },
     "nocodb-alter-table-remove-column": {
-        description: "Nocodb - Alter Table Remove Column" + " get columnId from getTableMetadata...", // Simplifié
-        inputSchema: { columnId: z.string() }
+        description: "Nocodb - Alter Table Remove Column" + " get columnId from getTableMetadata" + " notes: remove column by columnId" + " example: c7uo2ruwc053a3a" + " [WARNING] this action is irreversible" + " [RECOMMENDATION] give warning to user",
+        inputSchema: {
+          type: "object",
+          properties: {
+            columnId: { type: "string" }
+          },
+          required: ["columnId"]
+        }
     },
     "nocodb-create-table": {
         description: "Nocodb - Create Table",
-        inputSchema: { tableName: z.string(), data: z.array(z.object({ title: z.string(), uidt: z.enum(["SingleLineText", "Number", "Checkbox", "DateTime"]) })) }
+        inputSchema: {
+          type: "object",
+          properties: {
+            tableName: { type: "string" },
+            data: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  title: { type: "string" },
+                  "uidt": { type: "string", enum: ["SingleLineText", "Number", "Checkbox", "DateTime"], description: "SingleLineText, Number, Checkbox, DateTime" } // Correction: guillemets autour de uidt
+                },
+                required: ["title", "uidt"]
+              },
+              description: "The data to be inserted into the table.\n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await createTable(\"Shinobi\", [\n        {\n            title: \"Name\",\n            uidt: \"SingleLineText\"\n        },\n        {\n            title: \"Age\",\n            uidt: \"Number\"\n        },\n        {\n            title: \"isHokage\",\n            uidt: \"Checkbox\"\n        },\n        {\n            title: \"Birthday\",\n            uidt: \"DateTime\"\n        }\n    ]\n)"
+            }
+          },
+          required: ["tableName", "data"]
+        }
     }
-    // Note: Les descriptions complètes et les schémas Zod exacts doivent être utilisés ici.
-    // Ceci est une représentation simplifiée pour le diff.
 };
 
 
