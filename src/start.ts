@@ -521,7 +521,7 @@ const response = await createTable("Shinobi", [
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      res.flushHeaders(); // Envoie les headers immédiatement
+      // res.flushHeaders(); // Envoie les headers immédiatement
 
       // Crée un nouveau transport SSE pour cette connexion spécifique
       // Le '/messages' indique au client où envoyer les messages via POST
