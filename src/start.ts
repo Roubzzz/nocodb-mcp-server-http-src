@@ -712,6 +712,16 @@ const response = await createTable("Shinobi", [
       if (req.body && req.body.method === "initialize") {
         console.log(`[${timestamp}] Tentative de gestion manuelle de l'initialisation`);
         try {
+          // Générer dynamiquement la liste des outils exposés
+          const toolsObj: Record<string, any> = {};
+          for (const [toolName, toolDef] of Object.entries((server as any)._tools)) {
+            // Cast toolDef to any to access properties
+            const toolDefinition = toolDef as any;
+            toolsObj[toolName] = {
+              description: toolDefinition.description,
+              inputSchema: toolDefinition.inputSchema
+            };
+          }
           // Répondre manuellement à l'initialisation avec la même version de protocole
           const response = {
             jsonrpc: "2.0",
@@ -723,7 +733,7 @@ const response = await createTable("Shinobi", [
                 version: "1.0.0"
               },
               capabilities: {
-                tools: true
+                tools: toolsObj
               }
             }
           };
