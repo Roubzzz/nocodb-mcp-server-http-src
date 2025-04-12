@@ -145,16 +145,13 @@ export async function patchRecords(tableName: string, rowId: number, data: any) 
     console.log(`[patchRecords] Called with tableName: ${tableName}, rowId: ${rowId}`);
     const tableId = await getTableId(tableName);
     console.log(`[patchRecords] Resolved tableId: ${tableId} for tableName: ${tableName}`);
-    const newData = [{
-        ...data,
-        "Id": String(rowId), // Ensure Id is sent as a string in the payload
-    }]
-    const requestUrl = `/api/v2/tables/${tableId}/records`;
-    console.log(`[patchRecords] Attempting PATCH request to URL: ${nocodbClient.defaults.baseURL}${requestUrl}`);
-    console.log(`[patchRecords] Request payload (newData): ${JSON.stringify(newData)}`);
+    const requestUrl = `/api/v2/tables/${tableId}/records/${rowId}`; // Use record ID in the URL path
+    console.log(`[patchRecords] Attempting PATCH request to single-record URL: ${nocodbClient.defaults.baseURL}${requestUrl}`);
+    console.log(`[patchRecords] Request payload (data): ${JSON.stringify(data)}`);
 
     try {
-        const response = await nocodbClient.patch(requestUrl, newData);
+        // The single-record endpoint expects just the data object
+        const response = await nocodbClient.patch(requestUrl, data);
         console.log(`[patchRecords] PATCH request successful. Status: ${response.status}`);
         return {
             output: response.data,
@@ -165,18 +162,13 @@ export async function patchRecords(tableName: string, rowId: number, data: any) 
         if (axios.isAxiosError(error)) {
             console.error(`[patchRecords] Axios Error Details: Status=${error.response?.status}, Data=${JSON.stringify(error.response?.data)}`);
         }
-        // Re-throw the error so the tool handler catches it
         throw error;
     }
 }
 
 export async function deleteRecords(tableName: string, rowId: number) {
     const tableId = await getTableId(tableName);
-    const data: any =
-        {
-            "Id": rowId
-        }
-    const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records`, {data});
+const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records/${rowId}`);
     return response.data;
 }
 
