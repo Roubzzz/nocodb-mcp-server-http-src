@@ -265,117 +265,7 @@ const server = new McpServer({
     version: "1.0.0"
 });
 
-// Construire manuellement l'objet capabilities.tools avec des JSON Schemas standards
-const staticToolsCapabilities = {
-    "nocodb-get-records": {
-        description: "Nocodb - Get Records" + `hint:\n    1. Get all records from a table (limited to 10):\n       retrieve_records(table_name=\"customers\")\n       \n    3. Filter records with conditions:\n       retrieve_records(\n           table_name=\"customers\", \n           filters=\"(age,gt,30)~and(status,eq,active)\"\n       )\n       \n    4. Paginate results:\n       retrieve_records(table_name=\"customers\", limit=20, offset=40)\n       \n    5. Sort results:\n       retrieve_records(table_name=\"customers\", sort=\"-created_at\")\n       \n    6. Select specific fields:\n       retrieve_records(table_name=\"customers\", fields=\"id,name,email\")\n`,
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string" },
-            filters: { type: "string", description: `Example: where=(field1,eq,value1)~and(field2,eq,value2) will filter records where 'field1' is equal to 'value1' AND 'field2' is equal to 'value2'.\nYou can also use other comparison operators like 'ne' (not equal), 'gt' (greater than), 'lt' (less than), and more, to create complex filtering rules.\n ${filterRules}` },
-            limit: { type: "number" },
-            offset: { type: "number" },
-            sort: { type: "string", description: "Example: sort=field1,-field2 will sort the records first by 'field1' in ascending order and then by 'field2' in descending order." },
-            fields: { type: "string", description: "Example: fields=field1,field2 will include only 'field1' and 'field2' in the API response." }
-          },
-          required: ["tableName"]
-        }
-    },
-    "nocodb-get-list-tables": {
-        description: "Nocodb - Get List Tables\nnotes: only show result from output to user",
-        inputSchema: { type: "object", properties: {} } // Schéma vide pour aucun argument
-    },
-    "nocodb-post-records": {
-        description: "Nocodb - Post Records",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string", description: "table name" },
-            data: { description: "The data to be inserted into the table. \n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await postRecords(\"Shinobi\", {\n        Title: \"sasuke\"\n})" } // {} représente 'any' en JSON Schema
-          },
-          required: ["tableName", "data"]
-        }
-    },
-    "nocodb-patch-records": {
-        description: "Nocodb - Patch Records",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string" },
-            rowId: { type: "number" },
-            data: { description: "The data to be updated in the table.\n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await patchRecords(\"Shinobi\", 2, {\n            Title: \"sasuke-updated\"\n})" }
-          },
-          required: ["tableName", "rowId", "data"]
-        }
-    },
-    "nocodb-delete-records": {
-        description: "Nocodb - Delete Records",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string" },
-            rowId: { type: "number" }
-          },
-          required: ["tableName", "rowId"]
-        }
-    },
-    "nocodb-get-table-metadata": {
-        description: "Nocodb - Get Table Metadata",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string" }
-          },
-          required: ["tableName"]
-        }
-    },
-    "nocodb-alter-table-add-column": {
-        description: "Nocodb - Alter Table Add Column",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string" },
-            columnName: { type: "string" },
-            columnType: { type: "string", description: "SingleLineText, Number, Decimals, DateTime, Checkbox" }
-          },
-          required: ["tableName", "columnName", "columnType"]
-        }
-    },
-    "nocodb-alter-table-remove-column": {
-        description: "Nocodb - Alter Table Remove Column" + " get columnId from getTableMetadata" + " notes: remove column by columnId" + " example: c7uo2ruwc053a3a" + " [WARNING] this action is irreversible" + " [RECOMMENDATION] give warning to user",
-        inputSchema: {
-          type: "object",
-          properties: {
-            columnId: { type: "string" }
-          },
-          required: ["columnId"]
-        }
-    },
-    "nocodb-create-table": {
-        description: "Nocodb - Create Table",
-        inputSchema: {
-          type: "object",
-          properties: {
-            tableName: { type: "string" },
-            data: {
-              type: "array",
-              items: {
-                type: "object",
-                properties: {
-                  title: { type: "string" },
-                  "uidt": { type: "string", enum: ["SingleLineText", "Number", "Checkbox", "DateTime"], description: "SingleLineText, Number, Checkbox, DateTime" } // Correction: guillemets autour de uidt
-                },
-                required: ["title", "uidt"]
-              },
-              description: "The data to be inserted into the table.\n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await createTable(\"Shinobi\", [\n        {\n            title: \"Name\",\n            uidt: \"SingleLineText\"\n        },\n        {\n            title: \"Age\",\n            uidt: \"Number\"\n        },\n        {\n            title: \"isHokage\",\n            uidt: \"Checkbox\"\n        },\n        {\n            title: \"Birthday\",\n            uidt: \"DateTime\"\n        }\n    ]\n)"
-            }
-          },
-          required: ["tableName", "data"]
-        }
-    }
-};
-
+// staticToolsCapabilities supprimé car l'initialisation sera gérée par le SDK
 
 async function main() {
 
@@ -821,41 +711,12 @@ const response = await createTable("Shinobi", [
       console.log(`[${timestamp}] POST /messages Body brut reçu :`, JSON.stringify(req.body));
       // ---> FIN AJOUT <---
 
-      // Interception manuelle de la requête d'initialisation MCP
-      if (req.body && req.body.method === "initialize") {
-        console.log(`[${timestamp}] Tentative de gestion manuelle de l'initialisation`);
-        try {
-          // Utiliser l'objet capabilities statique construit au démarrage
-          const response = {
-            jsonrpc: "2.0",
-            id: req.body.id,
-            result: {
-              protocolVersion: req.body.params.protocolVersion, // Utiliser la version demandée par le client
-              serverInfo: {
-                name: "nocodb-mcp-server", // Utiliser la valeur statique
-                version: "1.0.0" // Utiliser la valeur statique
-              },
-              capabilities: {
-                tools: staticToolsCapabilities // Utilisation de l'objet statique
-              }
-            }
-          };
-          // Log de la réponse envoyée (sans les détails des schémas pour la lisibilité)
-          console.log(`[${timestamp}] Réponse d'initialisation manuelle (statique) envoyée pour ID ${req.body.id}`);
-          res.json(response);
-          return; // Important: sortir de la fonction après avoir répondu
-        } catch (error) {
-          console.error(`[${timestamp}] Erreur lors de la réponse manuelle (statique):`, error);
-           if (!res.headersSent) {
-             // Renvoyer une erreur MCP structurée
-             res.status(500).json({ jsonrpc: "2.0", id: req.body.id, error: { code: -32000, message: "Erreur interne lors de la construction de la réponse d'initialisation" } });
-           }
-        }
-      }
+      // Le bloc d'interception manuelle de 'initialize' a été supprimé.
+      // Le SDK gérera maintenant la requête 'initialize' via handlePostMessage.
 
       if (transport) {
         try {
-          // Délègue la gestion du message au transport SSE approprié
+          // Délègue la gestion de TOUS les messages (y compris initialize) au transport SSE approprié
           await transport.handlePostMessage(req, res);
           // handlePostMessage devrait gérer l'envoi de la réponse HTTP au client
         } catch (error) {
