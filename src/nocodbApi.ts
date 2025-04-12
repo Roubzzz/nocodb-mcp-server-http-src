@@ -368,7 +368,7 @@ export async function alterTableAddColumn(
             title: columnName,
             uidt: columnType,
             parentId: options.parentId, // Use the literal 'parentId' field name as indicated by the error message
-            // childId is implicitly the tableId where the column is created
+            childId: options.childId, // Explicitly add childId to the payload
             // fk_child_column_id, fk_parent_column_id might be handled by NocoDB or needed for specific cases (null for now)
             fk_child_column_id: null,
             fk_parent_column_id: null,
