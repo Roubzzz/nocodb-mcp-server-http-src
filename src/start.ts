@@ -292,7 +292,7 @@ const staticToolsCapabilities = {
           type: "object",
           properties: {
             tableName: { type: "string", description: "table name" },
-            data: { description: "The data to be inserted into the table. \n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await postRecords(\"Shinobi\", {\n        Title: \"sasuke\"\n})" } // {} représente 'any' en JSON Schema
+            data: true // Utiliser 'true' pour représenter 'any' en JSON Schema standard
           },
           required: ["tableName", "data"]
         }
@@ -304,7 +304,7 @@ const staticToolsCapabilities = {
           properties: {
             tableName: { type: "string" },
             rowId: { type: "number" },
-            data: { description: "The data to be updated in the table.\n[WARNING] The structure of this object should match the columns of the table.\nexample:\nconst response = await patchRecords(\"Shinobi\", 2, {\n            Title: \"sasuke-updated\"\n})" }
+            data: true // Utiliser 'true' pour représenter 'any' en JSON Schema standard
           },
           required: ["tableName", "rowId", "data"]
         }
