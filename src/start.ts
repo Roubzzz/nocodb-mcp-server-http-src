@@ -168,8 +168,13 @@ export async function patchRecords(tableName: string, rowId: number, data: any) 
 
 export async function deleteRecords(tableName: string, rowId: number) {
     const tableId = await getTableId(tableName);
-const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records/${rowId}`);
-    return response.data;
+    try {
+        const response = await nocodbClient.delete(`/api/v2/tables/${tableId}/records/${rowId}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[deleteRecords] Error deleting record: ${error.message}`);
+        throw error;
+    }
 }
 
 export const getTableId = async (tableName: string): Promise<string> => {
