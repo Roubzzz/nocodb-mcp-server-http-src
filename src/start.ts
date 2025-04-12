@@ -5,6 +5,8 @@ import express, { Request, Response } from "express";
 import cors from 'cors';
 import {z} from "zod";
 import axios, {AxiosInstance} from "axios";
+import fs from 'fs/promises'; // Added for file reading
+import FormData from 'form-data'; // Added for file uploads
 
 let {NOCODB_URL, NOCODB_BASE_ID, NOCODB_API_TOKEN} = process.env;
 if (!NOCODB_URL || !NOCODB_BASE_ID || !NOCODB_API_TOKEN) {
@@ -286,6 +288,202 @@ export async function createTable(tableName: string, data: TableColumnType[]) {
     }
 }
 
+// 1. Lecture d'un enregistrement spécifique
+export async function getRecord(tableName: string, recordId: string, fields?: string) {
+    console.log(`[getRecord] Called with tableName: ${tableName}, recordId: ${recordId}, fields: ${fields}`);
+    const tableId = await getTableId(tableName);
+
+    // Créer l'URL avec éventuellement les champs spécifiés
+    let requestUrl = `/api/v2/tables/${tableId}/records/${recordId}`;
+    if (fields) {
+        requestUrl += `?fields=${fields}`;
+    }
+
+    console.log(`[getRecord] Requesting: ${nocodbClient.defaults.baseURL}${requestUrl}`);
+
+    try {
+        const response = await nocodbClient.get(requestUrl);
+        console.log(`[getRecord] GET response status: ${response.status}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[getRecord] GET request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[getRecord] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
+        throw error;
+    }
+}
+
+// 2. Comptage des enregistrements
+export async function countRecords(tableName: string, filters?: string, viewId?: string) {
+    console.log(`[countRecords] Called with tableName: ${tableName}, filters: ${filters}, viewId: ${viewId}`);
+    const tableId = await getTableId(tableName);
+
+    // Construire l'URL avec les paramètres optionnels
+    let requestUrl = `/api/v2/tables/${tableId}/records/count`;
+    const params = [];
+
+    if (filters) {
+        params.push(`where=${filters}`);
+    }
+
+    if (viewId) {
+        params.push(`viewId=${viewId}`);
+    }
+
+    if (params.length > 0) {
+        requestUrl += `?${params.join('&')}`;
+    }
+
+    console.log(`[countRecords] Requesting: ${nocodbClient.defaults.baseURL}${requestUrl}`);
+
+    try {
+        const response = await nocodbClient.get(requestUrl);
+        console.log(`[countRecords] GET response status: ${response.status}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[countRecords] GET request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[countRecords] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
+        throw error;
+    }
+}
+
+// 3. Liste des enregistrements liés
+export async function getLinkedRecords(
+    tableName: string,
+    linkFieldId: string,
+    recordId: string,
+    options?: {
+        fields?: string;
+        sort?: string;
+        filters?: string;
+        limit?: number;
+        offset?: number;
+    }
+) {
+    console.log(`[getLinkedRecords] Called with tableName: ${tableName}, linkFieldId: ${linkFieldId}, recordId: ${recordId}`);
+    const tableId = await getTableId(tableName);
+
+    let requestUrl = `/api/v2/tables/${tableId}/links/${linkFieldId}/records/${recordId}`;
+
+    // Ajouter les paramètres optionnels
+    const params = [];
+    if (options?.fields) params.push(`fields=${options.fields}`);
+    if (options?.sort) params.push(`sort=${options.sort}`);
+    if (options?.filters) params.push(`where=${options.filters}`);
+    if (options?.limit) params.push(`limit=${options.limit}`);
+    if (options?.offset) params.push(`offset=${options.offset}`);
+
+    if (params.length > 0) {
+        requestUrl += `?${params.join('&')}`;
+    }
+
+    console.log(`[getLinkedRecords] Requesting: ${nocodbClient.defaults.baseURL}${requestUrl}`);
+
+    try {
+        const response = await nocodbClient.get(requestUrl);
+        console.log(`[getLinkedRecords] GET response status: ${response.status}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[getLinkedRecords] GET request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[getLinkedRecords] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
+        throw error;
+    }
+}
+
+// 4. Lier des enregistrements
+export async function linkRecords(tableName: string, linkFieldId: string, recordId: string, linksToAdd: any[]) {
+    console.log(`[linkRecords] Called with tableName: ${tableName}, linkFieldId: ${linkFieldId}, recordId: ${recordId}`);
+    const tableId = await getTableId(tableName);
+
+    const requestUrl = `/api/v2/tables/${tableId}/links/${linkFieldId}/records/${recordId}`;
+
+    console.log(`[linkRecords] Requesting: ${nocodbClient.defaults.baseURL}${requestUrl} with data: ${JSON.stringify(linksToAdd)}`);
+
+    try {
+        const response = await nocodbClient.post(requestUrl, linksToAdd);
+        console.log(`[linkRecords] POST response status: ${response.status}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[linkRecords] POST request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[linkRecords] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
+        throw error;
+    }
+}
+
+// 5. Délier des enregistrements
+export async function unlinkRecords(tableName: string, linkFieldId: string, recordId: string, linksToRemove: any[]) {
+    console.log(`[unlinkRecords] Called with tableName: ${tableName}, linkFieldId: ${linkFieldId}, recordId: ${recordId}`);
+    const tableId = await getTableId(tableName);
+
+    const requestUrl = `/api/v2/tables/${tableId}/links/${linkFieldId}/records/${recordId}`;
+
+    console.log(`[unlinkRecords] Requesting DELETE: ${nocodbClient.defaults.baseURL}${requestUrl} with data: ${JSON.stringify(linksToRemove)}`);
+
+    try {
+        // NocoDB expects the IDs to remove in the data payload for DELETE on links
+        const response = await nocodbClient.delete(requestUrl, { data: linksToRemove });
+        console.log(`[unlinkRecords] DELETE response status: ${response.status}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[unlinkRecords] DELETE request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[unlinkRecords] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
+        throw error;
+    }
+}
+
+// 6. Téléchargement de pièces jointes (Corrected for Node.js)
+export async function uploadAttachment(filePathOnServer: string, storagePath: string, fileName: string, mimeType: string) {
+    console.log(`[uploadAttachment] Called with filePathOnServer: ${filePathOnServer}, storagePath: ${storagePath}, fileName: ${fileName}`);
+
+    // Read the file from the server's filesystem
+    let fileContent: Buffer;
+    try {
+        fileContent = await fs.readFile(filePathOnServer);
+    } catch (readError: any) {
+        console.error(`[uploadAttachment] Failed to read file from path: ${filePathOnServer}. Error: ${readError.message}`);
+        throw new Error(`Failed to read file: ${readError.message}`);
+    }
+
+    // Create a FormData object
+    const formData = new FormData();
+    formData.append('file', fileContent, {
+        filename: fileName,
+        contentType: mimeType,
+    });
+
+    // Construct the NocoDB upload URL, encoding the storage path
+    const requestUrl = `/api/v2/storage/upload?path=${encodeURIComponent(storagePath)}`;
+    console.log(`[uploadAttachment] Requesting POST to: ${nocodbClient.defaults.baseURL}${requestUrl}`);
+
+    try {
+        // Make the POST request with FormData
+        const response = await nocodbClient.post(requestUrl, formData, {
+            headers: {
+                ...formData.getHeaders(), // Important: Let form-data set the Content-Type and boundary
+                // 'xc-token' is already set globally in nocodbClient
+            }
+        });
+
+        console.log(`[uploadAttachment] POST response status: ${response.status}`);
+        return response.data; // NocoDB returns an array with attachment details
+    } catch (error: any) {
+        console.error(`[uploadAttachment] POST request failed: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[uploadAttachment] Status: ${error.response?.status}, Data: ${JSON.stringify(error.response?.data)}`);
+        }
+        throw error;
+    }
+}
+
 
 // Create an MCP server
 const server = new McpServer({
@@ -514,6 +712,211 @@ const response = await createTable("Shinobi", [
                     type: 'text',
                     mimeType: 'application/json',
                     text: JSON.stringify(response),
+                }],
+            }
+        }
+    );
+
+    // 1. Outil pour lire un enregistrement spécifique
+    server.tool("nocodb-get-record",
+        "Nocodb - Get Record" +
+        `hint:
+        1. Get a specific record by ID:
+           get_record(table_name="customers", record_id=1)
+
+        2. Select specific fields:
+           get_record(table_name="customers", record_id=1, fields="id,name,email")
+        `,
+        {
+            tableName: z.string(),
+            recordId: z.string().or(z.number()), // Allow string or number for flexibility
+            fields: z.string().optional().describe("Comma-separated list of fields to return. By default, all fields are included.")
+        },
+        async ({tableName, recordId, fields}) => {
+            // Ensure recordId is a string for the API call
+            const response = await getRecord(tableName, String(recordId), fields);
+            return {
+                content: [{
+                    type: 'text',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(response),
+                }],
+            }
+        }
+    );
+
+    // 2. Outil pour compter les enregistrements
+    server.tool("nocodb-count-records",
+        "Nocodb - Count Records" +
+        `hint:
+        1. Count all records in a table:
+           count_records(table_name="customers")
+
+        2. Count records with conditions:
+           count_records(
+               table_name="customers",
+               filters="(age,gt,30)~and(status,eq,active)"
+           )
+
+        3. Count records in a specific view:
+           count_records(table_name="customers", view_id="vw_abc123")
+        `,
+        {
+            tableName: z.string(),
+            filters: z.string().optional().describe("Filtering conditions. Same format as in get-records."),
+            viewId: z.string().optional().describe("Optional view ID to count records visible in a specific view.")
+        },
+        async ({tableName, filters, viewId}) => {
+            const response = await countRecords(tableName, filters, viewId);
+            return {
+                content: [{
+                    type: 'text',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(response), // NocoDB returns { count: number }
+                }],
+            }
+        }
+    );
+
+    // 3. Outil pour lister les enregistrements liés
+    server.tool("nocodb-get-linked-records",
+        "Nocodb - Get Linked Records" +
+        `hint:
+        1. Get all linked records:
+           get_linked_records(
+               table_name="orders",
+               link_field_id="cl_xyz123",
+               record_id=1
+           )
+
+        2. With pagination and filtering:
+           get_linked_records(
+               table_name="orders",
+               link_field_id="cl_xyz123",
+               record_id=1,
+               fields="id,product_name",
+               sort="-created_at",
+               filters="(quantity,gt,5)",
+               limit=10,
+               offset=0
+           )
+        `,
+        {
+            tableName: z.string(),
+            linkFieldId: z.string().describe("The ID of the LinkToAnotherRecord column (e.g., 'cl_xyz123')"),
+            recordId: z.string().or(z.number()),
+            fields: z.string().optional(),
+            sort: z.string().optional(),
+            filters: z.string().optional(),
+            limit: z.number().optional(),
+            offset: z.number().optional()
+        },
+        async ({tableName, linkFieldId, recordId, fields, sort, filters, limit, offset}) => {
+            const options = {fields, sort, filters, limit, offset};
+            // Ensure recordId is a string for the API call
+            const response = await getLinkedRecords(tableName, linkFieldId, String(recordId), options);
+            return {
+                content: [{
+                    type: 'text',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(response),
+                }],
+            }
+        }
+    );
+
+    // 4. Outil pour lier des enregistrements
+    server.tool("nocodb-link-records",
+        "Nocodb - Link Records" +
+        `hint:
+        Link records between tables:
+        link_records(
+            table_name="orders",
+            link_field_id="cl_xyz123",
+            record_id=1,
+            links_to_add=[{"id": 5}, {"id": 6}] // Use lowercase 'id'
+        )
+        `,
+        {
+            tableName: z.string(),
+            linkFieldId: z.string().describe("The ID of the LinkToAnotherRecord column"),
+            recordId: z.string().or(z.number()),
+            linksToAdd: z.array(z.object({
+                id: z.number() // NocoDB expects lowercase 'id' here
+            })).describe("Array of related record objects to link, e.g., [{'id': 5}, {'id': 6}]")
+        },
+        async ({tableName, linkFieldId, recordId, linksToAdd}) => {
+            // Ensure recordId is a string for the API call
+            const response = await linkRecords(tableName, linkFieldId, String(recordId), linksToAdd);
+            return {
+                content: [{
+                    type: 'text',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(response),
+                }],
+            }
+        }
+    );
+
+    // 5. Outil pour délier des enregistrements
+    server.tool("nocodb-unlink-records",
+        "Nocodb - Unlink Records" +
+        `hint:
+        Unlink records between tables:
+        unlink_records(
+            table_name="orders",
+            link_field_id="cl_xyz123",
+            record_id=1,
+            links_to_remove=[{"id": 5}, {"id": 6}] // Use lowercase 'id'
+        )
+        `,
+        {
+            tableName: z.string(),
+            linkFieldId: z.string().describe("The ID of the LinkToAnotherRecord column"),
+            recordId: z.string().or(z.number()),
+            linksToRemove: z.array(z.object({
+                id: z.number() // NocoDB expects lowercase 'id' here
+            })).describe("Array of related record objects to unlink, e.g., [{'id': 5}, {'id': 6}]")
+        },
+        async ({tableName, linkFieldId, recordId, linksToRemove}) => {
+            // Ensure recordId is a string for the API call
+            const response = await unlinkRecords(tableName, linkFieldId, String(recordId), linksToRemove);
+            return {
+                content: [{
+                    type: 'text',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(response),
+                }],
+            }
+        }
+    );
+
+    // 6. Outil pour télécharger des pièces jointes
+    server.tool("nocodb-upload-attachment",
+        "Nocodb - Upload Attachment" +
+        `hint:
+        Upload an attachment from the server running the MCP:
+        upload_attachment(
+            file_path_on_server="/path/on/mcp/server/to/file.jpg",
+            storage_path="attachments/images", // NocoDB storage path
+            file_name="my_uploaded_image.jpg", // Name in NocoDB
+            mime_type="image/jpeg"
+        )
+        `,
+        {
+            filePathOnServer: z.string().describe("Absolute path to the file on the server running this MCP"),
+            storagePath: z.string().describe("Path within NocoDB storage where the file will be stored (e.g., 'attachments/images')"),
+            fileName: z.string().describe("The desired file name for the attachment in NocoDB"),
+            mimeType: z.string().describe("MIME type of the file (e.g., 'image/jpeg', 'application/pdf')")
+            // fileSize is not needed as input, it's derived from the file read
+        },
+        async ({filePathOnServer, storagePath, fileName, mimeType}) => {
+            const response = await uploadAttachment(filePathOnServer, storagePath, fileName, mimeType);
+            return {
+                content: [{
+                    type: 'text',
+                    mimeType: 'application/json',
+                    text: JSON.stringify(response), // NocoDB returns array: [{ url, mimetype, title, size, ... }]
                 }],
             }
         }
