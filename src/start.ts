@@ -507,7 +507,7 @@ const response = await createTable("Shinobi", [
     // ---> Début : Implémentation Serveur HTTP/SSE <---
     const app = express();
     app.use(cors()); // Active CORS (Cross-Origin Resource Sharing)
-    app.use(express.json()); // Active le parsing des corps de requête JSON pour la route POST /messages
+    // app.use(express.json()); // REMOVED: Active le parsing des corps de requête JSON pour la route POST /messages - Let's see if the SDK handles raw body parsing
 
     // Dictionnaire pour stocker les transports actifs par ID de session
     const transports: {[sessionId: string]: SSEServerTransport} = {};
