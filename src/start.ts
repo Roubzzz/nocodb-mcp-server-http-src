@@ -142,17 +142,32 @@ export async function postRecords(tableName: string, data: unknown) {
 }
 
 export async function patchRecords(tableName: string, rowId: number, data: any) {
+    console.log(`[patchRecords] Called with tableName: ${tableName}, rowId: ${rowId}`);
     const tableId = await getTableId(tableName);
+    console.log(`[patchRecords] Resolved tableId: ${tableId} for tableName: ${tableName}`);
     const newData = [{
         ...data,
         "Id": rowId,
     }]
+    const requestUrl = `/api/v2/tables/${tableId}/records`;
+    console.log(`[patchRecords] Attempting PATCH request to URL: ${nocodbClient.defaults.baseURL}${requestUrl}`);
+    console.log(`[patchRecords] Request payload (newData): ${JSON.stringify(newData)}`);
 
-    const response = await nocodbClient.patch(`/api/v2/tables/${tableId}/records`, newData);
-    return {
-        output: response.data,
-        input: data
-    };
+    try {
+        const response = await nocodbClient.patch(requestUrl, newData);
+        console.log(`[patchRecords] PATCH request successful. Status: ${response.status}`);
+        return {
+            output: response.data,
+            input: data
+        }
+    } catch (error: any) {
+        console.error(`[patchRecords] PATCH request failed. Error: ${error.message}`);
+        if (axios.isAxiosError(error)) {
+            console.error(`[patchRecords] Axios Error Details: Status=${error.response?.status}, Data=${JSON.stringify(error.response?.data)}`);
+        }
+        // Re-throw the error so the tool handler catches it
+        throw error;
+    }
 }
 
 export async function deleteRecords(tableName: string, rowId: number) {
