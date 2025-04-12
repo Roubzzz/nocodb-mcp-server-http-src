@@ -530,15 +530,15 @@ async function main() {
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
         res.setHeader('X-Accel-Buffering', 'no'); // Useful for Nginx proxying
-        res.flushHeaders(); // Send headers immediately
+        // REMOVED: res.flushHeaders(); // Let SSEServerTransport handle headers
 
         const transport = new SSEServerTransport('/messages', res); // Pass response object
         const sessionId = transport.sessionId;
         transports[sessionId] = transport;
         console.log(`[${timestamp}] SSE transport created for session: ${sessionId}`);
 
-        // Send a connection confirmation event (optional)
-        res.write(`event: mcp-connected\ndata: ${JSON.stringify({ sessionId })}\n\n`);
+        // REMOVED: Manual write - Let the transport handle connection events if needed
+        // res.write(`event: mcp-connected\ndata: ${JSON.stringify({ sessionId })}\n\n`);
 
         res.on("close", () => {
             const closeTimestamp = new Date().toISOString();
